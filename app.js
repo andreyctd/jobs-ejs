@@ -18,9 +18,10 @@ store.on("error", function (error) {
   console.log(error);
 });
 
+//// ---------------- SESSION CONFIGURATION ---------------- ////
 const sessionParms = {
   secret: process.env.SESSION_SECRET,
-  resave: true,
+  resave: false,
   saveUninitialized: true,
   store: store,
   cookie: { secure: false, sameSite: "strict" },
@@ -31,12 +32,22 @@ if (app.get("env") === "production") {
   sessionParms.cookie.secure = true; // serve secure cookies
 }
 
+//// ---------------- SESSION MIDDLEWARE ---------------- ////
 app.use(session(sessionParms));
+
+//// ---------------- PASSPORT CONFIGURATION ---------------- ////
+const passport = require("passport");
+const passportInit = require("./passport/passportInit");
+
+passportInit();                   // configure the passport strategies and serialization
+app.use(passport.initialize());   // initialize passport
+app.use(passport.session());      // use passport's session handling middleware, which will deserialize the user from the session and make it available as req.user
 
 //// ---------------- FLASH MESSAGES ---------------- ////
 app.use(require("connect-flash")());
 
 //// ---------------- MIDDLEWARE ---------------- ////
+app.use(require("./middleware/storeLocals"));
 app.set("view engine", "ejs");
 // to parse the body of the POST request
 app.use(require("body-parser").urlencoded({ extended: true }));
@@ -50,10 +61,14 @@ app.use(require("body-parser").urlencoded({ extended: true }));
 ); */
 
 //// ---------------- ROUTES ---------------- ////
+app.get("/", (req, res) => {
+  res.render("index");
+});
+app.use("/sessions", require("./routes/sessionRoutes"));
 // secret word handling
 //   let secretWord = "syzygy";
 // Secret Word (stored per session)
-app.get("/secretWord", (req, res) => {
+/*   app.get("/secretWord", (req, res) => {
   if (!req.session.secretWord) {
     req.session.secretWord = "syzygy";
   }
@@ -72,7 +87,13 @@ app.post("/secretWord", (req, res) => {
     req.flash("info", "The secret word was changed.");
   }
   res.redirect("/secretWord");
-});
+});   */
+
+const secretWordRouter = require("./routes/secretWord");   // this router will handle all routes starting with /secretWord
+app.use("/secretWord", secretWordRouter);   // this will apply the auth middleware to all routes starting with /secretWord
+
+const auth = require("./middleware/auth");   // this middleware will check if the user is authenticated, and if not, it will redirect them to the logon page
+app.use("/secretWord", auth, secretWordRouter);   // this will apply the auth middleware to all routes starting with /secretWord
 
 //// ---------------- ERROR HANDLING ---------------- ////
 // 404 handler
@@ -91,6 +112,7 @@ const port = process.env.PORT || 3000;
 
 const start = async () => {
   try {
+    await require("./db/connect")(process.env.MONGO_URI);   // connect to the database before starting the server
     app.listen(port, () =>
       console.log(`Server is listening on port ${port}...`)
     );
