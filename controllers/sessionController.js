@@ -1,5 +1,5 @@
 const User = require("../models/User");
-const parseVErr = require("../util/parseValidationErr");
+const parseVErr = require("../utils/parseValidationErrs");
 
 const registerShow = (req, res) => {
   res.render("register");
