@@ -1,3 +1,6 @@
+<%- include("partials/head.ejs") %>
+<%- include("partials/header.ejs") %>
+
 <h2><%= job ? "Edit Job" : "Add Job" %></h2>
 
 <form method="POST" action="<%= job ? '/jobs/update/' + job._id : '/jobs' %>">
@@ -22,3 +25,5 @@
     <%= job ? "Update" : "Create" %>
   </button>
 </form>
+
+<%- include("partials/footer.ejs") %>

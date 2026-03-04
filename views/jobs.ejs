@@ -1,4 +1,8 @@
+<%- include("partials/head.ejs") %>
+<%- include("partials/header.ejs") %>
+
 <h2>Jobs List</h2>
+
     <table id="jobs-table">
       <tr id="jobs-table-header">
         <th>Company</th>
@@ -42,12 +46,14 @@
         <td><%= job.position %></td>
         <td><%= job.status %></td>
 
+        <!-- Edit Button (GET request) -->
         <td>
           <a href="/jobs/edit/<%= job._id %>">
             <button type="button">edit</button>
           </a>
         </td>
 
+        <!-- Delete Button (POST request with CSRF) -->
         <td>
           <form method="POST" action="/jobs/delete/<%= job._id %>" style="display:inline">
             <input type="hidden" name="_csrf" value="<%= csrfToken %>">
@@ -58,3 +64,5 @@
     <% }) %>
   <% } %>
 </table>
+
+<%- include("partials/footer.ejs") %>
