@@ -1,10 +1,28 @@
 const express = require("express");
 const session = require("express-session");
 const MongoDBStore = require("connect-mongodb-session")(session);
+const cookieParser = require("cookie-parser");
+const csrf = require("csurf");
+const helmet = require("helmet");
+const xss = require("xss-clean");
+const rateLimit = require("express-rate-limit");
+
 require("dotenv").config(); // to load the .env file into the process.env object
 require("express-async-errors");
 
 const app = express();
+
+//// ---------------- SECURITY MIDDLEWARE ---------------- ////
+
+app.use(helmet());
+app.use(xss());
+
+app.use(
+  rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 100, // limit each IP
+  })
+);
 
 //// ---------------- DATABASE SESSION STORE ---------------- ////
 const url = process.env.MONGO_URI;
@@ -32,6 +50,8 @@ if (app.get("env") === "production") {
   sessionParms.cookie.secure = true; // serve secure cookies
 }
 
+//// ---------------- MIDDLEWARE ORDER MATTERS ---------------- ////
+
 //// ---------------- SESSION MIDDLEWARE ---------------- ////
 app.use(session(sessionParms));
 
@@ -46,11 +66,27 @@ app.use(passport.session());      // use passport's session handling middleware,
 //// ---------------- FLASH MESSAGES ---------------- ////
 app.use(require("connect-flash")());
 
-//// ---------------- MIDDLEWARE ---------------- ////
+// Cookie parser (needed for CSRF)
+app.use(cookieParser(process.env.SESSION_SECRET));
+
+// Body parser
+app.use(express.urlencoded({ extended: true }));
+
+// CSRF protection
+app.use(csrf({ cookie: false }));
+
+// Make csrf token available to all views
+app.use((req, res, next) => {
+  res.locals.csrfToken = req.csrfToken();
+  next();
+});
+
+//// ---------------- MIDDLEWARE ( CUSTOM LOCALS )---------------- ////
 app.use(require("./middleware/storeLocals"));
+
 app.set("view engine", "ejs");
 // to parse the body of the POST request
-app.use(require("body-parser").urlencoded({ extended: true }));
+//   app.use(require("body-parser").urlencoded({ extended: true }));
 
 /* app.use(
   session({
@@ -61,9 +97,11 @@ app.use(require("body-parser").urlencoded({ extended: true }));
 ); */
 
 //// ---------------- ROUTES ---------------- ////
+// Home page
 app.get("/", (req, res) => {
   res.render("index");
 });
+// Session routes (register, login, logoff)
 app.use("/sessions", require("./routes/sessionRoutes"));
 // secret word handling
 //   let secretWord = "syzygy";
@@ -89,11 +127,16 @@ app.post("/secretWord", (req, res) => {
   res.redirect("/secretWord");
 });   */
 
+// Protected routes
 const secretWordRouter = require("./routes/secretWord");   // this router will handle all routes starting with /secretWord
-app.use("/secretWord", secretWordRouter);   // this will apply the auth middleware to all routes starting with /secretWord
-
+//   app.use("/secretWord", secretWordRouter);   // this will apply the auth middleware to all routes starting with /secretWord
+// Auth-protected secretWord routes
 const auth = require("./middleware/auth");   // this middleware will check if the user is authenticated, and if not, it will redirect them to the logon page
 app.use("/secretWord", auth, secretWordRouter);   // this will apply the auth middleware to all routes starting with /secretWord
+// Auth-protected jobs routes
+const jobsRouter = require("./routes/jobs");
+app.use("/jobs", auth, jobsRouter);
+
 
 //// ---------------- ERROR HANDLING ---------------- ////
 // 404 handler
@@ -103,8 +146,14 @@ app.use((req, res) => {
 
 // global error handler
 app.use((err, req, res, next) => {
-  res.status(500).send(err.message);
   console.log(err);
+
+  if (err.code === "EBADCSRFTOKEN") {
+    return res.status(403).send("Invalid CSRF token.");
+  }
+
+  res.status(500).send(err.message);
+  //   console.log(err);
 });
 
 //// ---------------- SERVER START ---------------- ////
