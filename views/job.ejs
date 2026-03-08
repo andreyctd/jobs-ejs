@@ -1,0 +1,36 @@
+<%- include("partials/head.ejs") %>
+<%- include("partials/header.ejs") %>
+
+<h2><%= job ? "Edit Job" : "Add Job" %></h2>
+
+<form method="POST" action="<%= job ? '/jobs/update/' + job._id : '/jobs' %>">
+  <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+
+  <div>
+    <label>Company:</label>
+    <input name="company" value="<%= job ? job.company : '' %>">
+  </div>
+
+  <div>
+    <label>Position:</label>
+    <input name="position" value="<%= job ? job.position : '' %>">
+  </div>
+
+  <div>
+    <label>Status:</label>
+    <select name="status">
+      <option value="Applied" <%= job && job.status === "Applied" ? "selected" : "" %>>Applied</option>
+      <option value="Interview" <%= job && job.status === "Interview" ? "selected" : "" %>>Interview</option>
+      <option value="Pending" <%= job && job.status === "Pending" ? "selected" : "" %>>Pending</option>
+      <option value="Declined" <%= job && job.status === "Declined" ? "selected" : "" %>>Declined</option>
+    <!-- Old input field removed because we now use a select dropdown -->
+    <!-- <input name="status" value="<%= job ? job.status : '' %>"> -->
+    </select>
+  </div>
+
+  <button type="submit">
+    <%= job ? "Update" : "Create" %>
+  </button>
+</form>
+
+<%- include("partials/footer.ejs") %>
